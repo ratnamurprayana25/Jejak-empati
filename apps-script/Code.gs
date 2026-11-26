@@ -7,7 +7,8 @@
  *   Yang memiliki akses : Siapa saja
  * Salin URL aplikasi web (berakhiran /exec) dan masukkan ke game.
  *
- * Sheet "Check-in" : satu baris per check-in pemain
+ * Sheet "Check-in" : satu baris per check-in pemain (foto disimpan di folder Drive
+ *                    "Jejak Empati - Foto check-in", link-nya di kolom Foto)
  * Sheet "Skor"     : satu baris per permainan (diperbarui saat game selesai)
  */
 
@@ -18,13 +19,15 @@ const TAB_CHECKIN = 'Check-in';
 const TAB_SKOR = 'Skor';
 
 const HEAD_CHECKIN = ['Waktu', 'Nomor helm', 'Sudah mencoba', 'Perasaan', 'Tersulit',
-  'Pertanyaan refleksi', 'Refleksi', 'ID permainan'];
+  'Pertanyaan refleksi', 'Refleksi', 'ID permainan', 'Foto'];
+const PHOTO_FOLDER = 'Jejak Empati - Foto check-in';
 const HEAD_SKOR = ['ID permainan', 'Pemain', 'Skor', 'XP', 'Gelar', 'Warga ditenangkan',
   'Ricuh', 'Selesai', 'Mulai', 'Terakhir diperbarui'];
 
 /** Jalankan sekali dari editor (opsional) untuk membuat kedua tab beserta judul kolomnya. */
 function setup() {
-  tab_(TAB_CHECKIN, HEAD_CHECKIN);
+  heads_(tab_(TAB_CHECKIN, HEAD_CHECKIN), HEAD_CHECKIN);
+  folder_();
   tab_(TAB_SKOR, HEAD_SKOR);
 }
 
@@ -76,6 +79,9 @@ function doGet(e) {
 
 function saveCheckin_(d) {
   const sh = tab_(TAB_CHECKIN, HEAD_CHECKIN);
+  heads_(sh, HEAD_CHECKIN);
+  let foto = '';
+  try { if (d.foto) foto = savePhoto_(d.foto, d.helm); } catch (err) { foto = 'Foto gagal disimpan'; }
   sh.appendRow([
     new Date(),
     "'" + txt_(d.helm, 10).replace(/^'/, ''), // tetap teks, supaya 07 tidak jadi 7
@@ -84,7 +90,8 @@ function saveCheckin_(d) {
     txt_(d.tersulit, 80),
     txt_(d.pertanyaan_refleksi, 160),
     txt_(d.refleksi, 350),
-    validId_(d.id) ? d.id : ''
+    validId_(d.id) ? d.id : '',
+    foto
   ]);
 }
 
@@ -114,7 +121,31 @@ function saveRun_(d) {
   }
 }
 
+/** Simpan foto (data URL base64) ke folder Drive, kembalikan link-nya. */
+function savePhoto_(dataUrl, helm) {
+  const m = /^data:(image\/(jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/.exec(String(dataUrl));
+  if (!m) return '';
+  const bytes = Utilities.base64Decode(m[3]);
+  if (bytes.length > 6 * 1024 * 1024) return 'Foto terlalu besar';
+  const ext = m[2] === 'jpeg' ? 'jpg' : m[2];
+  const stamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd-HHmmss');
+  const name = 'helm-' + (String(helm || 'x').replace(/[^0-9A-Za-z]/g, '') || 'x') + '-' + stamp + '.' + ext;
+  return folder_().createFile(Utilities.newBlob(bytes, m[1], name)).getUrl();
+}
+
+function folder_() {
+  const it = DriveApp.getFoldersByName(PHOTO_FOLDER);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(PHOTO_FOLDER);
+}
+
 /* ---------- bantuan ---------- */
+
+/** Pastikan judul kolom terbaru ada (tab lama belum punya kolom Foto). */
+function heads_(sh, head) {
+  const cur = sh.getRange(1, 1, 1, head.length).getValues()[0];
+  if (cur.join('|') !== head.join('|')) sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold');
+}
+
 
 function tab_(name, head) {
   const ss = SpreadsheetApp.openById(SHEET_ID);

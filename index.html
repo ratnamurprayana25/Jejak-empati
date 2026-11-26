@@ -345,6 +345,12 @@ body.talking .joy,body.talking .act{display:none}
 .ckq{font-weight:800;font-size:16px;line-height:1.4}
 #ckText{font:inherit;font-size:16px;color:var(--ink);background:rgba(255,255,255,.06);border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;min-height:110px;resize:vertical;user-select:text;-webkit-user-select:text;touch-action:auto}
 #ckText:focus{outline:none;border-color:var(--kunyit)}
+.ckphoto{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.ckpick{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 18px;border:1.5px dashed var(--kunyit);border-radius:12px;color:var(--ink);font-weight:800;cursor:pointer;width:fit-content;background:rgba(242,177,52,.06)}
+.ckpick span{font-size:22px;line-height:1;color:var(--kunyit)}
+.ckpick[hidden],.ckprev[hidden]{display:none}
+.ckprev{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ckprev img{width:120px;height:90px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
 .ckcount{font-size:12.5px;color:var(--muted);text-align:right;margin-top:-6px}
 .ckremind{background:rgba(240,180,58,.12);border-radius:12px;padding:12px 14px;font-size:14.5px;line-height:1.5}
 .ckremind b{color:var(--kunyit)}
@@ -569,6 +575,13 @@ body.talking .joy,body.talking .act{display:none}
     <p class="hint" style="margin:-4px 0 0">Jangan cantumkan nama atau informasi pribadi orang yang bercerita.</p>
     <textarea id="ckText" maxlength="350" placeholder="Ternyata selama ini aku sering ingin langsung memberi solusi, padahal..."></textarea>
     <div class="ckcount"><span id="ckCount">0</span> / 350 · opsional</div>
+    <div class="ckphoto">
+      <span class="ckq" style="margin:0">Foto <span style="font-weight:600;opacity:.7">(opsional)</span></span>
+      <p class="hint" style="margin:0">Misalnya suasana saat kamu mendengarkan. Kalau ada wajah orang lain, pastikan mereka sudah setuju.</p>
+      <label class="ckpick" id="ckPick"><input type="file" id="ckFile" accept="image/*" hidden><span aria-hidden="true">+</span> Tambah foto</label>
+      <div class="ckprev" id="ckPrev" hidden><img id="ckImg" alt="Pratinjau foto"><button type="button" class="linkbtn" id="ckRm">Hapus foto</button></div>
+      <p class="hint" id="ckFileErr" style="margin:0" aria-live="polite"></p>
+    </div>
     <div class="ckremind"><b>Little reminder:</b> Mendengarkan bukan berarti harus selalu punya solusi. Kadang kehadiran kita saja sudah berarti.</div>
     <div class="ckfoot"><button class="ghost" type="button" id="ck2back">← Kembali</button><button class="cta" type="button" id="ck2play">Let's Play! →</button></div>
   </section>
@@ -3205,7 +3218,7 @@ function ckStep(n){
 function openCheckin(){
   CK={};
   document.querySelectorAll('#checkin [aria-pressed]').forEach(b=>b.setAttribute('aria-pressed','false'));
-  $('ckText').value='';$('ckCount').textContent='0';$('ck1err').textContent='';$('ckHelm').value='';
+  $('ckText').value='';$('ckCount').textContent='0';$('ck1err').textContent='';$('ckHelm').value='';ckPhotoReset();
   ckStep(1);setTimeout(()=>{try{$('ckHelm').focus({preventScroll:true})}catch(e){}},80);$('title').classList.add('open');$('checkin').classList.add('open');
 }
 document.querySelectorAll('#checkin [data-q]').forEach(g=>g.addEventListener('click',e=>{
@@ -3276,8 +3289,24 @@ const GS={sent:{},board:[],loaded:false,poll:0};
 function gsOn(){return /^https:\/\/script\.google\.com\/(macros|a\/macros\/[^/]+)\/s\/[\w-]+\/exec$/.test(SHEET_URL)}
 function gsPost(o){
   if(!gsOn())return;
-  try{fetch(SHEET_URL,{method:'POST',mode:'no-cors',keepalive:true,headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(o)}).catch(()=>{})}catch(e){}
+  const body=JSON.stringify(o);
+  try{fetch(SHEET_URL,{method:'POST',mode:'no-cors',keepalive:body.length<60000,headers:{'Content-Type':'text/plain;charset=utf-8'},body}).catch(()=>{})}catch(e){}
 }
+/* foto check-in: dikecilkan di perangkat (maks 1280px, JPEG) lalu dikirim bersama check-in */
+let CKP=null;
+function ckPhotoReset(){CKP=null;try{$('ckFile').value=''}catch(e){}$('ckPrev').hidden=true;$('ckImg').removeAttribute('src');$('ckPick').hidden=false;$('ckFileErr').textContent=''}
+function ckShrink(file){return new Promise((ok,no)=>{
+  const url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{try{const k=Math.min(1,1280/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*k));c.height=Math.max(1,Math.round(img.naturalHeight*k));c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);ok(c.toDataURL('image/jpeg',.78))}catch(e){URL.revokeObjectURL(url);no(e)}};
+  img.onerror=()=>{URL.revokeObjectURL(url);no(new Error('decode'))};img.src=url;
+})}
+$('ckFile').addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0];if(!f)return;
+  $('ckFileErr').textContent='Memproses foto…';
+  try{const data=await ckShrink(f);CKP={data};$('ckImg').src=data;$('ckPrev').hidden=false;$('ckPick').hidden=true;$('ckFileErr').textContent=gsOn()?'Foto siap dikirim bersama check-in.':'Foto hanya terkirim kalau game tersambung ke Google Sheet.'}
+  catch(err){CKP=null;$('ckFileErr').textContent='Foto ini tidak bisa dibaca. Coba foto lain (JPG atau PNG).';try{$('ckFile').value=''}catch(x){}}
+});
+$('ckRm').addEventListener('click',ckPhotoReset);
 function gsLoad(){
   if(!gsOn())return;
   try{fetch(SHEET_URL+'?board=1',{cache:'no-store'}).then(r=>r.json()).then(j=>{
@@ -3316,7 +3345,8 @@ function sendCheckin(name){
     const body=new URLSearchParams({'form-name':'checkin',nama:name,sudah_mencoba:c.triedLabel||'',perasaan:c.feelLabel||'',tersulit:c.hardLabel||'',pertanyaan_refleksi:c.q4||'',refleksi:c.reflection||''});
     try{fetch('/',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()}).catch(()=>{})}catch(e){}
   }
-  gsPost({type:'checkin',id:S.runId,helm:c.helm||'',sudah_mencoba:c.triedLabel||'',perasaan:c.feelLabel||'',tersulit:c.hardLabel||'',pertanyaan_refleksi:c.q4||'',refleksi:c.reflection||''});
+  gsPost({type:'checkin',id:S.runId,helm:c.helm||'',sudah_mencoba:c.triedLabel||'',perasaan:c.feelLabel||'',tersulit:c.hardLabel||'',pertanyaan_refleksi:c.q4||'',refleksi:c.reflection||'',foto:CKP?CKP.data:''});
+  CKP=null;
 }
 setTimeout(gsLoad,600);
 
