@@ -1,7 +1,7 @@
 /**
  * Jejak Empati — penampung data di Google Sheets
  * ------------------------------------------------
- * Tempel seluruh isi file ini di Ekstensi → Apps Script pada Google Sheet kamu,
+ * Buka script.new, tempel seluruh isi file ini (atau lewat Ekstensi → Apps Script di Sheet),
  * lalu Terapkan → Deployment baru → Aplikasi web
  *   Jalankan sebagai : Saya
  *   Yang memiliki akses : Siapa saja
@@ -10,6 +10,9 @@
  * Sheet "Check-in" : satu baris per check-in pemain
  * Sheet "Skor"     : satu baris per permainan (diperbarui saat game selesai)
  */
+
+// ID Google Sheet tujuan (dari link docs.google.com/spreadsheets/d/<ID>/edit)
+const SHEET_ID = '11FZcv8muGlwp75d-6BE36xGC0H2DhDuGpoZPstBUIVE';
 
 const TAB_CHECKIN = 'Check-in';
 const TAB_SKOR = 'Skor';
@@ -114,7 +117,7 @@ function saveRun_(d) {
 /* ---------- bantuan ---------- */
 
 function tab_(name, head) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SpreadsheetApp.openById(SHEET_ID);
   let sh = ss.getSheetByName(name);
   if (!sh) {
     sh = ss.insertSheet(name);
